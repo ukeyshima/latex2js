@@ -2,7 +2,9 @@ const katex = require('katex');
 const mathjs = require('mathjs');
 const mathIntegral = require('mathjs-simple-integral');
 const atl = require('asciimath-to-latex');
+const acorn = require('acorn');
 
+let code = '';
 mathjs.import(mathIntegral);
 let latex2js,
   radix,
@@ -21,11 +23,13 @@ let latex2js,
   limit,
   matrixParse,
   matrix,
+  matrixs,
   matrixMultiplication,
   matrixOperations,
   matrixShape,
   shape,
-  nextMulti;
+  nextMulti,
+  inverse;
 
 radix = input => {
   return input.index
@@ -92,14 +96,17 @@ log = input => {
 
 sum = input => {
   const expression = shape(input.slice(1, input.length));
-  const start = shape(input[0].sub.body);
+  const index = input[0].sub.body.findIndex(e => {
+    return e.type === 'atom' && e.text === '=';
+  });
+  const startVari = shape(input[0].sub.body.slice(0, index));
+  const startValu = shape(
+    input[0].sub.body.slice(index + 1, input[0].sub.body.length)
+  );
   const end = shape(input[0].sup.body);
-
   return `((() => {
         let result = 0;
-        for(let ${start[0]}=${start.slice(2, start.length)};${
-    start[0]
-  }<${end};${start[0]}++){
+        for(let ${startVari}=${startValu};${startVari}<${end};${startVari}++){
             result += ${expression};
         }
         return result;
@@ -146,7 +153,28 @@ matrixParse = input => {
 };
 
 matrix = input => {
-  console.log(input);
+  let result = [];
+  let num = 0;
+  result[num] = [];
+  input.body[0].body[0].forEach(e => {
+    const index = e.body[0].body.findIndex(t => {
+      return t.type === 'spacing';
+    });
+    if (index === -1) {
+      result[num].push(shape(e.body[0].body));
+    } else {
+      result[num].push(shape(e.body[0].body.slice(0, index)));
+      num++;
+      result[num] = [];
+      result[num].push(
+        shape(e.body[0].body.slice(index + 1, e.body[0].body.length))
+      );
+    }
+  });
+  return result;
+};
+
+inverse = input => {
   let result = [];
   let num = 0;
   result[num] = [];
@@ -169,7 +197,6 @@ matrix = input => {
 };
 
 matrixs = input => {
-  console.log(input);
   input = input.map(i => {
     let result;
     const a = [];
@@ -216,7 +243,6 @@ matrixMultiplication = (array, input) => {
             a.forEach((e, j) => {
               const q = [];
               e.some((f, k) => {
-                console.log(e.length);
                 let r = '';
                 for (let t = 0; t < e.length; t++) {
                   r += `+${e[t]}*${input[i][t][k]}`;
@@ -254,10 +280,6 @@ matrixShape = (array, input) => {
       const index = input.findIndex(e => {
         return e.type !== 'leftright';
       });
-      console.log(index);
-      if (index !== -1) {
-        console.log(input.slice(0, index));
-      }
       result =
         index === -1
           ? matrixMultiplication(array, input)
@@ -290,7 +312,7 @@ nextMulti = (input, num) => {
     : ``;
 };
 
-shape = input => {
+shape = (input, code) => {
   let result;
   if (!Array.isArray(input)) {
     switch (typeof input) {
@@ -317,43 +339,59 @@ shape = input => {
       }`;
       break;
     case 'mathord':
-      console.log(input);
       result = `${
         input[0].text === '\\pi'
           ? `Math.PI`
           : input.length > 1 &&
             input[1].type === 'atom' &&
             input[1].text === '='
-            ? `let ${input[0].text}`
+            ? (() => {
+                const jsParse = acorn.parse(code);
+                console.log(jsParse);
+                return jsParse.body.find(e => {
+                  return (
+                    e.type === 'VariableDeclaration' &&
+                    e.declarations[0].id.name === input[0].text
+                  );
+                })
+                  ? input[0].text
+                  : `let ${input[0].text}`;
+              })()
             : input[0].text
       }${
         input.length > 1
-          ? input[1].type === 'leftright' && input[1].left === '[' && input[1].right==="]"
-            ? (()=>{
-                let index = input.slice(1,input.length).findIndex(e=>{
-                    return !(e.type==="leftright" && e.left==="[" && e.right==="]")
-                })
-                index=index===-1?input.length-1:index;
-                const array=input.slice(2,index+1);
-                array.unshift(`[${shape(input[1].body)}]`) 
-                return `${array.reduce((pre,cur)=>{
-                return pre+`[${shape(cur.body)}]`
+          ? input[1].type === 'leftright' &&
+            input[1].left === '[' &&
+            input[1].right === ']'
+            ? (() => {
+                let index = input.slice(1, input.length).findIndex(e => {
+                  return !(
+                    e.type === 'leftright' &&
+                    e.left === '[' &&
+                    e.right === ']'
+                  );
+                });
+                index = index === -1 ? input.length - 1 : index;
+                const array = input.slice(2, index + 1);
+                array.unshift(`[${shape(input[1].body)}]`);
+                return `${array.reduce((pre, cur) => {
+                  return pre + `[${shape(cur.body)}]`;
                 })}${
-                  input.length > index+1
-                    ? (input[index+1].type !== 'atom' &&
-                      input[index+1].type !== 'punct' &&
-                      input[index+1].type !== 'bin' &&
-                      input[index+1].type !== 'spacing' &&
-                      (input[index+1].type === 'leftright'
-                        ? shape(input[index+1]).length !== 3 &&
+                  input.length > index + 1
+                    ? (input[index + 1].type !== 'atom' &&
+                      input[index + 1].type !== 'punct' &&
+                      input[index + 1].type !== 'bin' &&
+                      input[index + 1].type !== 'spacing' &&
+                      (input[index + 1].type === 'leftright'
+                        ? shape(input[index + 1]).length !== 3 &&
                           !/\,/.test(shape(input[index])) &&
-                          !input[index+1].left === '['
+                          !input[index + 1].left === '['
                         : true)
                         ? `*`
-                        : ``) + shape(input.slice(index+1, input.length))
+                        : ``) + shape(input.slice(index + 1, input.length))
                     : ``
-                }` 
-            })()
+                }`;
+              })()
             : (input[1].type !== 'atom' &&
               input[1].type !== 'punct' &&
               input[1].type !== 'bin' &&
@@ -402,7 +440,16 @@ shape = input => {
       result =
         input[0].body[0].type === 'array'
           ? input.length > 1
-            ? `[${matrixShape(matrix(input[0]), input.slice(1, input.length))}]`
+            ? (() => {
+                return Array.isArray(
+                  matrixShape(matrix(input[0]), input.slice(1, input.length))
+                )
+                  ? `[${matrixShape(
+                      matrix(input[0]),
+                      input.slice(1, input.length)
+                    )}]`
+                  : matrixShape(matrix(input[0]), input.slice(1, input.length));
+              })()
             : `[${matrix(input[0])}]`
           : `${leftright(input[0])}${nextMulti(input, 1)}`;
       break;
@@ -471,16 +518,22 @@ shape = input => {
             result = `${limit(input)}${nextMulti(input, 2)}`;
             break;
           default:
-          let elementIndex=`[${shape(input[0].sub.body)}]`;
-          elementIndex=elementIndex.replace(/,/g,"][");
-            result = `${shape(input[0].base)}${elementIndex}`;
+            let elementIndex = `[${shape(input[0].sub.body)}]`;
+            elementIndex = elementIndex.replace(/,/g, '][');
+            result =
+              `${shape(input[0].base)}${elementIndex}` + nextMulti(input, 1);
             break;
         }
       } else {
         if (input[0].sup.body[0].text === '\\prime') {
           result = `${differential(input[0])}${nextMulti(input, 1)}`;
         } else {
-          result = `${pow(input[0])}${nextMulti(input, 1)}`;
+          result = `${
+            input[0].base.type === 'leftright' &&
+            input[0].base.body[0].type === 'array'
+              ? inverse(input[0].base)
+              : pow(input[0])
+          }${nextMulti(input, 1)}`;
         }
       }
       break;
@@ -491,18 +544,26 @@ shape = input => {
   return result;
 };
 
-latex2js = input => {
+export default (latex2js = (input, program) => {
+  code = program;
   while (input.search(/\n/) >= 0) {
     input = input.replace(/\n/g, ' ');
   }
   input = matrixParse(input);
   const parseTree = katex.__parse(input);
-  return shape(parseTree);
-};
+  return shape(parseTree, code);
+});
 
-console.log(latex2js(`x_{1,0,3,4}`))
+console.log(
+  latex2js(`\\begin{aligned}\\begin{pmatrix}
+1 & 0 \\
+0 & 1
+\\end{pmatrix}^{-1}\\end{aligned}`)
+);
+console.log(latex2js(`x_{1,0,3,4}`));
 console.log(latex2js(`x_{10}`));
-console.log(latex2js(`y=\\sqrt {\\dfrac {3^{5}}{2}}`));
+console.log(latex2js(`y=\\sqrt {\\dfrac {3^{5}}{2}}`, code));
+console.log(latex2js(`a=\\sqrt {\\dfrac {3^{5}}{2}}`, code));
 console.log(
   latex2js(`\\begin{aligned}\\begin{pmatrix}
 x & 2\\
@@ -577,6 +638,11 @@ f & 4
 console.log(
   latex2js(
     `\\begin{aligned}\\begin{pmatrix} a\\left[ 0\\right]  \\ a\\left[ 1\\right]  \\end{pmatrix}\\begin{pmatrix} b\\left[ 0\\right]  \\ b\\left[ 1\\right]  \\end{pmatrix}\\end{aligned}`
+  )
+);
+console.log(
+  latex2js(
+    `\\begin{aligned}\\begin{pmatrix} a\\left[ 0\\right]  \\ a\\left[ 1\\right]  \\end{pmatrix}+\\begin{pmatrix} b\\left[ 0\\right]  \\ b\\left[ 1\\right]  \\end{pmatrix}\\end{aligned}`
   )
 );
 console.log(

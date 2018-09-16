@@ -13,6 +13,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "acorn": "^5.7.2",
     "asciimath-to-latex": "^0.3.2",
     "babel-loader": "^7.1.5",
     "browser-sync": "^2.24.6",
