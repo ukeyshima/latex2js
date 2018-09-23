@@ -153,6 +153,10 @@ matrixParse = input => {
 };
 
 matrix = input => {
+  console.log(input);
+  if (input.type === 'textord' || input.type === 'mathord') {
+    return input.text;
+  }
   let result = [];
   let num = 0;
   result[num] = [];
@@ -274,6 +278,8 @@ matrixOperations = (array, input, operations) => {
 };
 
 matrixShape = (array, input) => {
+  console.log(array);
+  console.log(input);
   let result = [];
   switch (input[0].type) {
     case 'leftright':
@@ -347,7 +353,6 @@ shape = (input, code) => {
             input[1].text === '='
             ? (() => {
                 const jsParse = acorn.parse(code);
-                console.log(jsParse);
                 return jsParse.body.find(e => {
                   return (
                     e.type === 'VariableDeclaration' &&
@@ -437,24 +442,24 @@ shape = (input, code) => {
       result = `${radix(input[0])}${nextMulti(input, 1)}`;
       break;
     case 'leftright':
-      result =
-        input[0].body[0].type === 'array'
-          ? input.length > 1
-            ? (() => {
-                return Array.isArray(
-                  matrixShape(matrix(input[0]), input.slice(1, input.length))
-                )
-                  ? `[${matrixShape(
-                      matrix(input[0]),
-                      input.slice(1, input.length)
-                    )}]`
-                  : matrixShape(matrix(input[0]), input.slice(1, input.length));
-              })()
-            : `[${matrix(input[0])}]`
-          : `${leftright(input[0])}${nextMulti(input, 1)}`;
+      result = `${leftright(input[0])}${nextMulti(input, 1)}`;
       break;
     case 'array':
-      result = shape(input[0].body[0][0]);
+      input = input[0].body[0][0].body[0].body;
+      result =
+        input.length > 1
+          ? (() => {
+              return Array.isArray(
+                matrixShape(matrix(input[0]), input.slice(1, input.length))
+              )
+                ? `[${matrixShape(
+                    matrix(input[0]),
+                    input.slice(1, input.length)
+                  )}]`
+                : matrixShape(matrix(input[0]), input.slice(1, input.length));
+            })()
+          : `[${matrix(input[0])}]`;
+      //result = matrixShape(input[0].body[0][0].body[0].body);
       break;
     case 'genfrac':
       result = `${frac(input[0])}${nextMulti(input, 1)}`;
@@ -556,160 +561,181 @@ export default (latex2js = (input, program) => {
 
 console.log(
   latex2js(`\\begin{aligned}\\begin{pmatrix}
-1 & 0 \\
-0 & 1
-\\end{pmatrix}^{-1}\\end{aligned}`)
-);
-console.log(latex2js(`x_{1,0,3,4}`));
-console.log(latex2js(`x_{10}`));
-console.log(latex2js(`y=\\sqrt {\\dfrac {3^{5}}{2}}`, code));
-console.log(latex2js(`a=\\sqrt {\\dfrac {3^{5}}{2}}`, code));
-console.log(
-  latex2js(`\\begin{aligned}\\begin{pmatrix}
-x & 2\\
-y & 1
-\\end{pmatrix}-\\begin{pmatrix}
-i\\left[ 0\\right] \\left[ 1\\right] \\left[ 2\\right] 3 & u\\left[ 0\\right] \\left[ 1\\right]  \\
-i\\left[ 0\\right] \\left[ 1\\right] & U\\left[ 0\\right] \\left[ 1\\right]
-\\end{pmatrix}\\end{aligned}`)
-);
-console.log(
-  latex2js(`\\begin{aligned}\\begin{pmatrix}
-1 & 2 \\
+1 & 2 \\\\
 0 & 0
 \\end{pmatrix}\\begin{pmatrix}
-2 & 4 \\
+2 & 4 \\\\
 5 & 3
 \\end{pmatrix}+\\begin{pmatrix}
-1 & 2 \\
+1 & 2 \\\\
 9 & 2
 \\end{pmatrix}\\end{aligned}`)
 );
 console.log(
-  latex2js(`\\begin{aligned}\\begin{pmatrix}
-1.5 & i\\left[ 0\\right] & 0 & 3^{4^{2}} \\
-0.9 & \\left[ n\\right] & 0 & 0 \\
-0 & 0 & 1 & \\cos \\left( \\pi \\right) \\
-0 & 0 & 0 & 1
+  latex2js(`\\begin{aligned}2\\begin{pmatrix}
+1 & 0 \\\\
+0 & 1
 \\end{pmatrix}\\begin{pmatrix}
-2 & 3 & 4 & v \\
-t & g & 3 & 2 \\
-0 & a & 3 & 1 \\
-5 & 2 & 2 & k
-\\end{pmatrix}\\begin{pmatrix}
-4 & 2 & 4 & 8 \\
-5 & 9 & h & 2 \\
-6 & h & b & n \\
-k & g & a & x
-\\end{pmatrix}-\\begin{pmatrix}
-4 & s & 4 & 8 \\
-5 & r & h & 2 \\
-m & r & b & n \\
-b & t & a & 3
+1 & 5 \\\\
+2 & 3
 \\end{pmatrix}\\end{aligned}`)
 );
-console.log(
-  latex2js(`\\begin{aligned}\\begin{pmatrix}
-\\left[ x\\right]  \\
-\\left[ y\\right]
-\\end{pmatrix}\\end{aligned}`)
-);
-console.log(latex2js(`n-\\left[ n\\right] `));
-console.log(latex2js(`c\\left[ 0\\right] +2`));
-console.log(latex2js(`p\\left( 0\\right) +2`));
-console.log(
-  latex2js(
-    `\\begin{aligned}\\begin{pmatrix} a & 2\\ b & 1 \\end{pmatrix}+\\begin{pmatrix} c & 2 \\ d & 3\\end{pmatrix}\\end{aligned}`
-  )
-);
-console.log(
-  latex2js(`\\begin{aligned}\\begin{pmatrix}
-n & 0 & 2\\
-0 & a & 8
-\\end{pmatrix}\\begin{pmatrix}
-3 & b \\
-0 & s \\
-3 & 5
-\\end{pmatrix}\\begin{pmatrix}
-2 & 0 \\
-f & 4
-\\end{pmatrix}\\end{aligned}`)
-);
-console.log(
-  latex2js(
-    `\\begin{aligned}\\begin{pmatrix} a\\left[ 0\\right]  \\ a\\left[ 1\\right]  \\end{pmatrix}\\begin{pmatrix} b\\left[ 0\\right]  \\ b\\left[ 1\\right]  \\end{pmatrix}\\end{aligned}`
-  )
-);
-console.log(
-  latex2js(
-    `\\begin{aligned}\\begin{pmatrix} a\\left[ 0\\right]  \\ a\\left[ 1\\right]  \\end{pmatrix}+\\begin{pmatrix} b\\left[ 0\\right]  \\ b\\left[ 1\\right]  \\end{pmatrix}\\end{aligned}`
-  )
-);
-console.log(
-  latex2js(
-    `\\begin{aligned}\\begin{pmatrix} a & 2\\ b & 1 \\end{pmatrix}+\\begin{pmatrix} c & 2 \\ d & 3\\end{pmatrix}\\end{aligned}`
-  )
-);
-console.log(latex2js('3^{4^{2}}'));
-console.log(
-  latex2js(
-    `\\begin{aligned}\\begin{pmatrix} 1 \\ 0 \\end{pmatrix}\\begin{pmatrix} 3 & 2 \\end{pmatrix}\\end{aligned}`
-  )
-);
-console.log(
-  latex2js(
-    `\\begin{aligned}\\begin{pmatrix} 1 \\ v \\end{pmatrix}\\begin{pmatrix} r \\ 0 \\end{pmatrix}\\end{aligned}`
-  )
-);
-console.log(
-  latex2js(
-    '\\begin{aligned}5\\begin{pmatrix} 1 \\ 0 \\end{pmatrix}\\begin{pmatrix} x \\ y \\end{pmatrix}\\end{aligned}'
-  )
-);
-console.log(
-  latex2js(
-    `\\begin{aligned}\\sin \\left( \\begin{pmatrix} 3 \\ 4 \\end{pmatrix}\\begin{pmatrix} a \\ h \\end{pmatrix}\\right) \\cdot 64\\end{aligned}`
-  )
-);
-console.log(
-  eval(
-    latex2js('\\lim _{x\\rightarrow \\infty }\\left( \\dfrac {3}{x}\\right) ')
-  )
-);
-console.log(
-  eval(
-    latex2js('\\lim _{x\\rightarrow \\infty }\\left( \\dfrac {x}{2}\\right) ')
-  )
-);
-console.log(latex2js('3+3'));
-console.log(latex2js('x+y'));
-console.log(latex2js('3-2'));
-console.log(latex2js('x-y'));
-console.log(latex2js("\\left( \\log \\left( x\\right)\\right) '"));
-console.log(latex2js('\\int ^{3}_{2}5xdx'));
-console.log(latex2js('\\int 3x^{5}dx'));
-console.log(latex2js('\\int \\log \\left( x\\right) dx'));
-console.log(latex2js('\\sum ^{10}_{k=1}\\left( 3k^{3}\\right)'));
-console.log(latex2js('\\sum ^{10}_{k=1}p\\left( x,y\\right) '));
-console.log(latex2js('\\sum ^{10}_{k=1}p\\left( xy\\right) '));
-console.log(latex2js('\\sum ^{10}_{k=1}p\\left( x\\right) '));
-console.log(
-  latex2js(
-    '\\dfrac {\\sum ^{10}_{k=1}\\left( \\left( \\dfrac {1}{2}\\right) ^{k}p\\left( 2^{k}x,2^{k}y\\right) \\right) }{\\sum ^{10}_{k=1}\\left( \\dfrac {1}{2}\\right) ^{k}}'
-  )
-);
-console.log(latex2js('42^{3}'));
-console.log(latex2js('\\left( 42\\right) ^{\\left( 3\\right)}'));
-console.log(latex2js('\\sqrt {3}'));
-console.log(latex2js('\\dfrac {2}{3}'));
-console.log(latex2js('3^{2}'));
-console.log(latex2js('\\sqrt [3] {2}'));
-console.log(latex2js('\\sqrt {\\left( 3\\right) }'));
-console.log(latex2js('\\cos \\left( \\pi \\right)'));
-console.log(latex2js('\\log _{2}3'));
-console.log(latex2js('\\log _{2}\\left( 3^{2}\\right)'));
-console.log(latex2js('32xy'));
-console.log(latex2js('3x\\sqrt {y}'));
-console.log(latex2js('32x\\sqrt {2}'));
-console.log(latex2js('8\\sqrt {\\dfrac {42^{3}}{3}}'));
-console.log(latex2js('\\sum ^{10}_{k=1}\\left( 3k^{2}\\right) '));
+// console.log(
+//   latex2js(`\\begin{aligned}\\begin{pmatrix}
+// 1 & 0 \\\\
+// 0 & 1
+// \\end{pmatrix}^{-1}\\end{aligned}`)
+// );
+// console.log(latex2js(`x_{1,0,3,4}`));
+// console.log(latex2js(`x_{10}`));
+// console.log(latex2js(`y=\\sqrt {\\dfrac {3^{5}}{2}}`, code));
+// console.log(latex2js(`a=\\sqrt {\\dfrac {3^{5}}{2}}`, code));
+// console.log(
+//   latex2js(`\\begin{aligned}\\begin{pmatrix}
+// x & 2\\\\
+// y & 1
+// \\end{pmatrix}-\\begin{pmatrix}
+// i\\left[ 0\\right] \\left[ 0\\right] \\left[ 2\\right] 3 & u\\left[ 0\\right] \\left[ 1\\right]  \\\\
+// i\\left[ 1\\right] \\left[ 0\\right] & u\\left[ 1\\right] \\left[ 1\\right]
+// \\end{pmatrix}\\end{aligned}`)
+// );
+// console.log(
+//   latex2js(`\\begin{aligned}\\begin{pmatrix}
+// 1 & 2 \\\\
+// 0 & 0
+// \\end{pmatrix}\\begin{pmatrix}
+// 2 & 4 \\\\
+// 5 & 3
+// \\end{pmatrix}+\\begin{pmatrix}
+// 1 & 2 \\\\
+// 9 & 2
+// \\end{pmatrix}\\end{aligned}`)
+// );
+// console.log(
+//   latex2js(`\\begin{aligned}\\begin{pmatrix}
+// 1.5 & i\\left[ 0\\right] & 0 & 3^{4^{2}} \\\\
+// 0.9 & \\left[ n\\right] & 0 & 0 \\\\
+// 0 & 0 & 1 & \\cos \\left( \\pi \\right) \\\\
+// 0 & 0 & 0 & 1
+// \\end{pmatrix}\\begin{pmatrix}
+// 2 & 3 & 4 & v \\\\
+// t & g & 3 & 2 \\\\
+// 0 & a & 3 & 1 \\\\
+// 5 & 2 & 2 & k
+// \\end{pmatrix}\\begin{pmatrix}
+// 4 & 2 & 4 & 8 \\\\
+// 5 & 9 & h & 2 \\\\
+// 6 & h & b & n \\\\
+// k & g & a & x
+// \\end{pmatrix}-\\begin{pmatrix}
+// 4 & s & 4 & 8 \\\\
+// 5 & r & h & 2 \\\\
+// m & r & b & n \\\\
+// b & t & a & 3
+// \\end{pmatrix}\\end{aligned}`)
+// );
+// console.log(
+//   latex2js(`\\begin{aligned}\\begin{pmatrix}
+// \\left[ x\\right]  \\\\
+// \\left[ y\\right]
+// \\end{pmatrix}\\end{aligned}`)
+// );
+// console.log(latex2js(`n-\\left[ n\\right] `));
+// console.log(latex2js(`c\\left[ 0\\right] +2`));
+// console.log(latex2js(`p\\left( 0\\right) +2`));
+// console.log(
+//   latex2js(
+//     `\\begin{aligned}\\begin{pmatrix} a & 2\\\\ b & 1 \\end{pmatrix}+\\begin{pmatrix} c & 2 \\\\ d & 3\\end{pmatrix}\\end{aligned}`
+//   )
+// );
+// console.log(
+//   latex2js(`\\begin{aligned}\\begin{pmatrix}
+// n & 0 & 2\\
+// 0 & a & 8
+// \\end{pmatrix}\\begin{pmatrix}
+// 3 & b \\\\
+// 0 & s \\\\
+// 3 & 5
+// \\end{pmatrix}\\begin{pmatrix}
+// 2 & 0 \\\\
+// f & 4
+// \\end{pmatrix}\\end{aligned}`)
+// );
+// console.log(
+//   latex2js(
+//     `\\begin{aligned}\\begin{pmatrix} a\\left[ 0\\right]  \\\\ a\\left[ 1\\right]  \\end{pmatrix}\\begin{pmatrix} b\\left[ 0\\right]  \\\\ b\\left[ 1\\right]  \\end{pmatrix}\\end{aligned}`
+//   )
+// );
+// console.log(
+//   latex2js(
+//     `\\begin{aligned}\\begin{pmatrix} a\\left[ 0\\right]  \\\\ a\\left[ 1\\right]  \\end{pmatrix}+\\begin{pmatrix} b\\left[ 0\\right]  \\\\ b\\left[ 1\\right]  \\end{pmatrix}\\end{aligned}`
+//   )
+// );
+// console.log(
+//   latex2js(
+//     `\\begin{aligned}\\begin{pmatrix} a & 2\\\\ b & 1 \\end{pmatrix}+\\begin{pmatrix} c & 2 \\\\ d & 3\\end{pmatrix}\\end{aligned}`
+//   )
+// );
+// console.log(latex2js('3^{4^{2}}'));
+// console.log(
+//   latex2js(
+//     `\\begin{aligned}\\begin{pmatrix} 1 \\\\ 0 \\end{pmatrix}\\begin{pmatrix} 3 & 2 \\end{pmatrix}\\end{aligned}`
+//   )
+// );
+// console.log(
+//   latex2js(
+//     `\\begin{aligned}\\begin{pmatrix} 1 \\\\ v \\end{pmatrix}\\begin{pmatrix} r \\\\ 0 \\end{pmatrix}\\end{aligned}`
+//   )
+// );
+// console.log(
+//   latex2js(
+//     '\\begin{aligned}5\\begin{pmatrix} 1 \\\\ 0 \\end{pmatrix}\\begin{pmatrix} x \\\\ y \\end{pmatrix}\\end{aligned}'
+//   )
+// );
+// console.log(
+//   latex2js(
+//     `\\begin{aligned}\\sin \\left( \\begin{pmatrix} 3 \\\\ 4 \\end{pmatrix}\\begin{pmatrix} a \\\\ h \\end{pmatrix}\\right) \\cdot 64\\end{aligned}`
+//   )
+// );
+// console.log(
+//   eval(
+//     latex2js('\\lim _{x\\rightarrow \\infty }\\left( \\dfrac {3}{x}\\right) ')
+//   )
+// );
+// console.log(
+//   eval(
+//     latex2js('\\lim _{x\\rightarrow \\infty }\\left( \\dfrac {x}{2}\\right) ')
+//   )
+// );
+// console.log(latex2js('3+3'));
+// console.log(latex2js('x+y'));
+// console.log(latex2js('3-2'));
+// console.log(latex2js('x-y'));
+// console.log(latex2js("\\left( \\log \\left( x\\right)\\right) '"));
+// console.log(latex2js('\\int ^{3}_{2}5xdx'));
+// console.log(latex2js('\\int 3x^{5}dx'));
+// console.log(latex2js('\\int \\log \\left( x\\right) dx'));
+// console.log(latex2js('\\sum ^{10}_{k=1}\\left( 3k^{3}\\right)'));
+// console.log(latex2js('\\sum ^{10}_{k=1}p\\left( x,y\\right) '));
+// console.log(latex2js('\\sum ^{10}_{k=1}p\\left( xy\\right) '));
+// console.log(latex2js('\\sum ^{10}_{k=1}p\\left( x\\right) '));
+// console.log(
+//   latex2js(
+//     '\\dfrac {\\sum ^{10}_{k=1}\\left( \\left( \\dfrac {1}{2}\\right) ^{k}p\\left( 2^{k}x,2^{k}y\\right) \\right) }{\\sum ^{10}_{k=1}\\left( \\dfrac {1}{2}\\right) ^{k}}'
+//   )
+// );
+// console.log(latex2js('42^{3}'));
+// console.log(latex2js('\\left( 42\\right) ^{\\left( 3\\right)}'));
+// console.log(latex2js('\\sqrt {3}'));
+// console.log(latex2js('\\dfrac {2}{3}'));
+// console.log(latex2js('3^{2}'));
+// console.log(latex2js('\\sqrt [3] {2}'));
+// console.log(latex2js('\\sqrt {\\left( 3\\right) }'));
+// console.log(latex2js('\\cos \\left( \\pi \\right)'));
+// console.log(latex2js('\\log _{2}3'));
+// console.log(latex2js('\\log _{2}\\left( 3^{2}\\right)'));
+// console.log(latex2js('32xy'));
+// console.log(latex2js('3x\\sqrt {y}'));
+// console.log(latex2js('32x\\sqrt {2}'));
+// console.log(latex2js('8\\sqrt {\\dfrac {42^{3}}{3}}'));
+// console.log(latex2js('\\sum ^{10}_{k=1}\\left( 3k^{2}\\right) '));
