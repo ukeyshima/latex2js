@@ -21,9 +21,8 @@ let latex2js,
   indefiniteIntegral,
   differential,
   limit,
-  matrixParse,
   matrix,
-  matrixs,
+  dot,
   matrixMultiplication,
   matrixOperations,
   matrixShape,
@@ -147,125 +146,67 @@ limit = input => {
   )})(${shape(input[0].sub.body.slice(index, input[0].sub.body.length))})`;
 };
 
-matrixParse = input => {
-  input = input.replace(/\\\\[\s\n]*(\w)/g, '\\ $1');
-  return input;
-};
-
 matrix = input => {
-  console.log(input);
+  if (!input.hasOwnProperty('type')) {
+    return input;
+  }
   if (input.type === 'textord' || input.type === 'mathord') {
     return input.text;
   }
-  let result = [];
-  let num = 0;
-  result[num] = [];
-  input.body[0].body[0].forEach(e => {
-    const index = e.body[0].body.findIndex(t => {
-      return t.type === 'spacing';
+  return input.body[0].body.map(e => {
+    return e.map(f => {
+      return shape(f);
     });
-    if (index === -1) {
-      result[num].push(shape(e.body[0].body));
-    } else {
-      result[num].push(shape(e.body[0].body.slice(0, index)));
-      num++;
-      result[num] = [];
-      result[num].push(
-        shape(e.body[0].body.slice(index + 1, e.body[0].body.length))
-      );
-    }
   });
-  return result;
 };
 
-inverse = input => {
-  let result = [];
-  let num = 0;
-  result[num] = [];
-  input.body[0].body[0].forEach(e => {
-    const index = e.body[0].body.findIndex(t => {
-      return t.type === 'spacing';
-    });
-    if (index === -1) {
-      result[num].push(shape(e.body[0].body));
-    } else {
-      result[num].push(shape(e.body[0].body.slice(0, index)));
-      num++;
-      result[num] = [];
-      result[num].push(
-        shape(e.body[0].body.slice(index + 1, e.body[0].body.length))
-      );
-    }
-  });
-  return result;
-};
+inverse = input => {};
 
-matrixs = input => {
-  input = input.map(i => {
-    let result;
-    const a = [];
-    let num = 0;
-    a[num] = [];
-    i.body[0].body[0].forEach(e => {
-      const index = e.body[0].body.findIndex(t => {
-        return t.type === 'spacing';
-      });
-      if (index === -1) {
-        a[num].push(shape(e.body[0].body));
-      } else {
-        a[num].push(shape(e.body[0].body.slice(0, index)));
-        num++;
-        a[num] = [];
-        a[num].push(
-          shape(e.body[0].body.slice(index + 1, e.body[0].body.length))
-        );
-      }
-    });
-    result = a;
-    return result;
+dot = (input1, input2) => {
+  let result = '';
+  input1.forEach((e, i) => {
+    result += `+${e}*${input2[i]}`;
   });
-  return input;
+  return `(${result})`;
 };
 
 matrixMultiplication = (array, input) => {
-  input = matrixs(input);
+  input = [matrix(input)];
   input.unshift(array);
-  input =
-    input[0][0].length === 1 && input[1][0].length === 1
-      ? (input => {
-          let result = '';
-          input[0].forEach((e, i) => {
-            result += `+${e}*${input[1][i]}`;
+  return (() => {
+    if (!Array.isArray(input[0])) {
+      return input[1].map(e => {
+        return e.map(f => {
+          return `(${input[0]}*${f})`;
+        });
+      });
+    } else if (input[0][0].length === 1 && input[1][0].length === 1) {
+      return dot(input[0], input[1]);
+    } else {
+      return (input => {
+        const o = [];
+        input[0].forEach((e, j) => {
+          const q = [];
+          e.some((f, k) => {
+            let r = '';
+            for (let i = 0; i < e.length; i++) {
+              r += `+${e[i]}*${input[1][i][k]}`;
+            }
+            r = '(' + r.slice(1, r.length) + ')';
+            q.push(r);
+            if (k === input[1].length - 1) return true;
           });
-          result = result.slice(1, result.length);
-          return `(${result})`;
-        })(input)
-      : (input => {
-          let a = input[0];
-          for (let i = 1; i < input.length; i++) {
-            const o = [];
-            a.forEach((e, j) => {
-              const q = [];
-              e.some((f, k) => {
-                let r = '';
-                for (let t = 0; t < e.length; t++) {
-                  r += `+${e[t]}*${input[i][t][k]}`;
-                }
-                r = '(' + r.slice(1, r.length) + ')';
-                q.push(r);
-                if (k === input[i][0].length - 1) return true;
-              });
-              o.push(q);
-            });
-            a = o;
-          }
-          return a;
-        })(input);
-  return input;
+          o.push(q);
+        });
+        return o;
+      })(input);
+    }
+  })();
 };
 
 matrixOperations = (array, input, operations) => {
-  input = matrix(input);
+  console.log(array);
+  console.log(input);
   const o = [];
   array.forEach((e, j) => {
     const q = [];
@@ -274,35 +215,106 @@ matrixOperations = (array, input, operations) => {
     });
     o.push(q);
   });
+  console.log(o);
   return o;
 };
 
 matrixShape = (array, input) => {
-  console.log(array);
-  console.log(input);
-  let result = [];
-  switch (input[0].type) {
-    case 'leftright':
-      const index = input.findIndex(e => {
-        return e.type !== 'leftright';
-      });
-      result =
-        index === -1
-          ? matrixMultiplication(array, input)
-          : matrixShape(
-              matrixMultiplication(array, input.slice(0, index)),
-              input.slice(index, input.length)
-            );
-      break;
-    case 'atom':
-      result =
-        input.length > 2
-          ? matrixShape(
-              matrixOperations(array, input[1], input[0].text),
-              input.slice(2, input.length)
-            )
-          : matrixOperations(array, input[1], input[0].text);
-      break;
+  if (input.length === 0) {
+    return array;
+  }
+  let result = '';
+  if (!input[0].hasOwnProperty('type')) {
+    result =
+      input.length > 1
+        ? matrixShape(
+            matrixMultiplication(array, input[0][0]),
+            input.slice(1, input.length)
+          )
+        : matrixMultiplication(array, input[0][0]);
+  } else {
+    switch (input[0].type) {
+      case 'leftright':
+        result =
+          input.length > 1
+            ? matrixShape(
+                matrixMultiplication(array, input[0]),
+                input.slice(1, input.length)
+              )
+            : matrixMultiplication(array, input[0]);
+        break;
+      case 'atom':
+        switch (input[0].text) {
+          case '=':
+            result = `${(() => {
+              const jsParse = acorn.parse(code);
+              return jsParse.body.find(e => {
+                return (
+                  e.type === 'VariableDeclaration' &&
+                  e.declarations[0].id.name === array
+                );
+              })
+                ? array
+                : `let ${array}`;
+            })(array)}=${
+              input.length > 2
+                ? (() => {
+                    input[1] = input[1].hasOwnProperty('type')
+                      ? input[1]
+                      : input[1][0];
+                    return Array.isArray(
+                      matrixShape(
+                        matrix(input[1]),
+                        input.slice(2, input.length)
+                      )
+                    )
+                      ? `[${matrixShape(
+                          matrix(input[1]),
+                          input.slice(2, input.length)
+                        )}]`
+                      : matrixShape(
+                          matrix(input[1]),
+                          input.slice(2, input.length)
+                        );
+                  })()
+                : `[${matrix(input[1])}]`
+            }`;
+            break;
+          case '*':
+            result = (() => {
+              input[1] = input[1].hasOwnProperty('type')
+                ? input[1]
+                : input[1][0];
+              return input.length > 2
+                ? matrixShape(
+                    matrixMultiplication(array, input[1]),
+                    input.slice(2, input.length)
+                  )
+                : matrixMultiplication(array, input[1]);
+            })();
+            break;
+          default:
+            result = (() => {
+              input[1] = input[1].hasOwnProperty('type')
+                ? input[1]
+                : input[1][0];
+              return input.length > 2
+                ? matrixShape(
+                    matrixOperations(array, matrix(input[1]), input[0].text),
+                    input.slice(2, input.length)
+                  )
+                : matrixOperations(array, matrix(input[1]), input[0].text);
+            })();
+            break;
+        }
+        break;
+      case 'supsub':
+        console.log(input[0].sup.body[0].text);
+        result =
+          input.length > 1
+            ? matrixShape(inverse(input[0].base), input.slice(1, input.length))
+            : inverse(input[0].base);
+    }
   }
   return result;
 };
@@ -318,7 +330,7 @@ nextMulti = (input, num) => {
     : ``;
 };
 
-shape = (input, code) => {
+shape = input => {
   let result;
   if (!Array.isArray(input)) {
     switch (typeof input) {
@@ -446,20 +458,41 @@ shape = (input, code) => {
       break;
     case 'array':
       input = input[0].body[0][0].body[0].body;
-      result =
-        input.length > 1
-          ? (() => {
-              return Array.isArray(
-                matrixShape(matrix(input[0]), input.slice(1, input.length))
-              )
-                ? `[${matrixShape(
-                    matrix(input[0]),
-                    input.slice(1, input.length)
-                  )}]`
-                : matrixShape(matrix(input[0]), input.slice(1, input.length));
-            })()
-          : `[${matrix(input[0])}]`;
-      //result = matrixShape(input[0].body[0][0].body[0].body);
+      input = (() => {
+        const input1 = [];
+        for (let i = 0; i < input.length; i++) {
+          if (
+            input[i].type === 'leftright' &&
+            input[i + 1] &&
+            input[i + 1].type === 'leftright'
+          ) {
+            let index = input.slice(i, input.length).findIndex(f => {
+              return f.type !== 'leftright';
+            });
+            index = index === -1 ? input.length : index;
+            input1.push([
+              matrixShape(matrix(input[i]), input.slice(i + 1, index))
+            ]);
+            i = index - 1;
+          } else {
+            input1.push(input[i]);
+          }
+        }
+        return input1;
+      })();
+      result = (() => {
+        if (input[0].hasOwnProperty('type')) {
+          input[0] = matrix(input[0]);
+        } else {
+          input[0] = input[0][0];
+        }
+
+        return Array.isArray(
+          matrixShape(input[0], input.slice(1, input.length))
+        )
+          ? `[${matrixShape(input[0], input.slice(1, input.length))}]`
+          : matrixShape(input[0], input.slice(1, input.length));
+      })();
       break;
     case 'genfrac':
       result = `${frac(input[0])}${nextMulti(input, 1)}`;
@@ -533,12 +566,7 @@ shape = (input, code) => {
         if (input[0].sup.body[0].text === '\\prime') {
           result = `${differential(input[0])}${nextMulti(input, 1)}`;
         } else {
-          result = `${
-            input[0].base.type === 'leftright' &&
-            input[0].base.body[0].type === 'array'
-              ? inverse(input[0].base)
-              : pow(input[0])
-          }${nextMulti(input, 1)}`;
+          result = `${pow(input[0])}${nextMulti(input, 1)}`;
         }
       }
       break;
@@ -554,7 +582,6 @@ export default (latex2js = (input, program) => {
   while (input.search(/\n/) >= 0) {
     input = input.replace(/\n/g, ' ');
   }
-  input = matrixParse(input);
   const parseTree = katex.__parse(input);
   return shape(parseTree, code);
 });
@@ -572,12 +599,9 @@ console.log(
 \\end{pmatrix}\\end{aligned}`)
 );
 console.log(
-  latex2js(`\\begin{aligned}2\\begin{pmatrix}
-1 & 0 \\\\
-0 & 1
-\\end{pmatrix}\\begin{pmatrix}
-1 & 5 \\\\
-2 & 3
+  latex2js(`\\begin{aligned}\\begin{pmatrix}
+\\left[ x\\right]  \\\\
+\\left[ y\\right]
 \\end{pmatrix}\\end{aligned}`)
 );
 // console.log(
@@ -586,117 +610,51 @@ console.log(
 // 0 & 1
 // \\end{pmatrix}^{-1}\\end{aligned}`)
 // );
+console.log(
+  latex2js(`\\begin{aligned}2\\begin{pmatrix}
+1 & 0 \\\\
+0 & 1
+\\end{pmatrix}\\begin{pmatrix}
+1 & 5 \\\\
+2 & 3
+\\end{pmatrix}\\end{aligned}`)
+);
+console.log(
+  latex2js(`\\begin{aligned}\\begin{pmatrix}
+1.5 & i\\left[ 0\\right] & 0 & 3^{4^{2}} \\\\
+0.9 & \\left[ n\\right] & 0 & 0 \\\\
+0 & 0 & 1 & \\cos \\left( \\pi \\right) \\\\
+0 & 0 & 0 & 1
+\\end{pmatrix}-\\begin{pmatrix}
+2 & 3 & 4 & v \\\\
+t & g & 3 & 2 \\\\
+0 & a & 3 & 1 \\\\
+5 & 2 & 2 & k
+\\end{pmatrix}\\begin{pmatrix}
+4 & 2 & 4 & 8 \\\\
+5 & 9 & h & 2 \\\\
+6 & h & b & n \\\\
+k & g & a & x
+\\end{pmatrix}\\begin{pmatrix}
+4 & s & 4 & 8 \\\\
+5 & r & h & 2 \\\\
+m & r & b & n \\\\
+b & t & a & 3
+\\end{pmatrix}\\end{aligned}`)
+);
+console.log(
+  latex2js(`\\begin{aligned}y=2\\begin{pmatrix}
+  3 & 2 \\\\
+  1 & 0
+  \\end{pmatrix}\\end{aligned}`)
+);
 // console.log(latex2js(`x_{1,0,3,4}`));
 // console.log(latex2js(`x_{10}`));
 // console.log(latex2js(`y=\\sqrt {\\dfrac {3^{5}}{2}}`, code));
 // console.log(latex2js(`a=\\sqrt {\\dfrac {3^{5}}{2}}`, code));
-// console.log(
-//   latex2js(`\\begin{aligned}\\begin{pmatrix}
-// x & 2\\\\
-// y & 1
-// \\end{pmatrix}-\\begin{pmatrix}
-// i\\left[ 0\\right] \\left[ 0\\right] \\left[ 2\\right] 3 & u\\left[ 0\\right] \\left[ 1\\right]  \\\\
-// i\\left[ 1\\right] \\left[ 0\\right] & u\\left[ 1\\right] \\left[ 1\\right]
-// \\end{pmatrix}\\end{aligned}`)
-// );
-// console.log(
-//   latex2js(`\\begin{aligned}\\begin{pmatrix}
-// 1 & 2 \\\\
-// 0 & 0
-// \\end{pmatrix}\\begin{pmatrix}
-// 2 & 4 \\\\
-// 5 & 3
-// \\end{pmatrix}+\\begin{pmatrix}
-// 1 & 2 \\\\
-// 9 & 2
-// \\end{pmatrix}\\end{aligned}`)
-// );
-// console.log(
-//   latex2js(`\\begin{aligned}\\begin{pmatrix}
-// 1.5 & i\\left[ 0\\right] & 0 & 3^{4^{2}} \\\\
-// 0.9 & \\left[ n\\right] & 0 & 0 \\\\
-// 0 & 0 & 1 & \\cos \\left( \\pi \\right) \\\\
-// 0 & 0 & 0 & 1
-// \\end{pmatrix}\\begin{pmatrix}
-// 2 & 3 & 4 & v \\\\
-// t & g & 3 & 2 \\\\
-// 0 & a & 3 & 1 \\\\
-// 5 & 2 & 2 & k
-// \\end{pmatrix}\\begin{pmatrix}
-// 4 & 2 & 4 & 8 \\\\
-// 5 & 9 & h & 2 \\\\
-// 6 & h & b & n \\\\
-// k & g & a & x
-// \\end{pmatrix}-\\begin{pmatrix}
-// 4 & s & 4 & 8 \\\\
-// 5 & r & h & 2 \\\\
-// m & r & b & n \\\\
-// b & t & a & 3
-// \\end{pmatrix}\\end{aligned}`)
-// );
-// console.log(
-//   latex2js(`\\begin{aligned}\\begin{pmatrix}
-// \\left[ x\\right]  \\\\
-// \\left[ y\\right]
-// \\end{pmatrix}\\end{aligned}`)
-// );
 // console.log(latex2js(`n-\\left[ n\\right] `));
 // console.log(latex2js(`c\\left[ 0\\right] +2`));
 // console.log(latex2js(`p\\left( 0\\right) +2`));
-// console.log(
-//   latex2js(
-//     `\\begin{aligned}\\begin{pmatrix} a & 2\\\\ b & 1 \\end{pmatrix}+\\begin{pmatrix} c & 2 \\\\ d & 3\\end{pmatrix}\\end{aligned}`
-//   )
-// );
-// console.log(
-//   latex2js(`\\begin{aligned}\\begin{pmatrix}
-// n & 0 & 2\\
-// 0 & a & 8
-// \\end{pmatrix}\\begin{pmatrix}
-// 3 & b \\\\
-// 0 & s \\\\
-// 3 & 5
-// \\end{pmatrix}\\begin{pmatrix}
-// 2 & 0 \\\\
-// f & 4
-// \\end{pmatrix}\\end{aligned}`)
-// );
-// console.log(
-//   latex2js(
-//     `\\begin{aligned}\\begin{pmatrix} a\\left[ 0\\right]  \\\\ a\\left[ 1\\right]  \\end{pmatrix}\\begin{pmatrix} b\\left[ 0\\right]  \\\\ b\\left[ 1\\right]  \\end{pmatrix}\\end{aligned}`
-//   )
-// );
-// console.log(
-//   latex2js(
-//     `\\begin{aligned}\\begin{pmatrix} a\\left[ 0\\right]  \\\\ a\\left[ 1\\right]  \\end{pmatrix}+\\begin{pmatrix} b\\left[ 0\\right]  \\\\ b\\left[ 1\\right]  \\end{pmatrix}\\end{aligned}`
-//   )
-// );
-// console.log(
-//   latex2js(
-//     `\\begin{aligned}\\begin{pmatrix} a & 2\\\\ b & 1 \\end{pmatrix}+\\begin{pmatrix} c & 2 \\\\ d & 3\\end{pmatrix}\\end{aligned}`
-//   )
-// );
-// console.log(latex2js('3^{4^{2}}'));
-// console.log(
-//   latex2js(
-//     `\\begin{aligned}\\begin{pmatrix} 1 \\\\ 0 \\end{pmatrix}\\begin{pmatrix} 3 & 2 \\end{pmatrix}\\end{aligned}`
-//   )
-// );
-// console.log(
-//   latex2js(
-//     `\\begin{aligned}\\begin{pmatrix} 1 \\\\ v \\end{pmatrix}\\begin{pmatrix} r \\\\ 0 \\end{pmatrix}\\end{aligned}`
-//   )
-// );
-// console.log(
-//   latex2js(
-//     '\\begin{aligned}5\\begin{pmatrix} 1 \\\\ 0 \\end{pmatrix}\\begin{pmatrix} x \\\\ y \\end{pmatrix}\\end{aligned}'
-//   )
-// );
-// console.log(
-//   latex2js(
-//     `\\begin{aligned}\\sin \\left( \\begin{pmatrix} 3 \\\\ 4 \\end{pmatrix}\\begin{pmatrix} a \\\\ h \\end{pmatrix}\\right) \\cdot 64\\end{aligned}`
-//   )
-// );
 // console.log(
 //   eval(
 //     latex2js('\\lim _{x\\rightarrow \\infty }\\left( \\dfrac {3}{x}\\right) ')
@@ -738,4 +696,3 @@ console.log(
 // console.log(latex2js('3x\\sqrt {y}'));
 // console.log(latex2js('32x\\sqrt {2}'));
 // console.log(latex2js('8\\sqrt {\\dfrac {42^{3}}{3}}'));
-// console.log(latex2js('\\sum ^{10}_{k=1}\\left( 3k^{2}\\right) '));
