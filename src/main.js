@@ -73,7 +73,7 @@ tan = input => {
 leftright = input => {
   let left = '(';
   let right = ')';
-  if (input.left === '[') {
+  if (input.left === '[' && input.right === ']') {
     left = 'Math.floor(';
   }
   return `${left}${shape(input.body)}${right}`;
@@ -167,6 +167,7 @@ dot = (input1, input2) => {
   input1.forEach((e, i) => {
     result += `+${e}*${input2[i]}`;
   });
+  result = result.slice(1, result.length);
   return `(${result})`;
 };
 
@@ -205,8 +206,6 @@ matrixMultiplication = (array, input) => {
 };
 
 matrixOperations = (array, input, operations) => {
-  console.log(array);
-  console.log(input);
   const o = [];
   array.forEach((e, j) => {
     const q = [];
@@ -215,7 +214,6 @@ matrixOperations = (array, input, operations) => {
     });
     o.push(q);
   });
-  console.log(o);
   return o;
 };
 
@@ -232,6 +230,31 @@ matrixShape = (array, input) => {
             input.slice(1, input.length)
           )
         : matrixMultiplication(array, input[0][0]);
+  } else if (array.hasOwnProperty('type')) {
+    switch (array.type) {
+      case 'op':
+        switch (array.name) {
+          case '\\sin':
+            result = `Math.sin(${matrixShape(
+              matrix(input[0].body[0]),
+              input[0].body.slice(1, input[0].body.length)
+            )})${nextMulti(input, 1)}`;
+            break;
+          case '\\cos':
+            result = `Math.cos(${matrixShape(
+              matrix(input[0].body[0]),
+              input[0].body.slice(1, input[0].body.length)
+            )})${nextMulti(input, 1)}`;
+            break;
+          case '\\tan':
+            result = `Math.tan(${matrixShape(
+              matrix(input[0].body[0]),
+              input[0].body.slice(1, input[0].body.length)
+            )})${nextMulti(input, 1)}`;
+            break;
+        }
+        break;
+    }
   } else {
     switch (input[0].type) {
       case 'leftright':
@@ -314,6 +337,9 @@ matrixShape = (array, input) => {
           input.length > 1
             ? matrixShape(inverse(input[0].base), input.slice(1, input.length))
             : inverse(input[0].base);
+        break;
+      default:
+        break;
     }
   }
   return result;
@@ -324,7 +350,8 @@ nextMulti = (input, num) => {
     ? (input[num].type !== 'atom' &&
       input[num].type !== 'punct' &&
       input[num].type !== 'bin' &&
-      input[num].type !== 'spacing'
+      input[num].type !== 'spacing' &&
+      !(input[num].type === 'textord' && input[num].text === '/')
         ? '*'
         : '') + shape(input.slice(num, input.length))
     : ``;
@@ -436,6 +463,12 @@ shape = input => {
         case '\\cdot':
           result = '*';
           break;
+        case '\\times':
+          result = '*';
+          break;
+        case '\\div':
+          result = '/';
+          break;
         default:
           result = input[0].text;
           break;
@@ -454,6 +487,7 @@ shape = input => {
       result = `${radix(input[0])}${nextMulti(input, 1)}`;
       break;
     case 'leftright':
+      console.log(input.slice(1, input.length));
       result = `${leftright(input[0])}${nextMulti(input, 1)}`;
       break;
     case 'array':
@@ -482,11 +516,13 @@ shape = input => {
       })();
       result = (() => {
         if (input[0].hasOwnProperty('type')) {
-          input[0] = matrix(input[0]);
+          if (input[0].type === 'op') {
+          } else {
+            input[0] = matrix(input[0]);
+          }
         } else {
           input[0] = input[0][0];
         }
-
         return Array.isArray(
           matrixShape(input[0], input.slice(1, input.length))
         )
@@ -583,71 +619,89 @@ export default (latex2js = (input, program) => {
     input = input.replace(/\n/g, ' ');
   }
   const parseTree = katex.__parse(input);
+  console.log(parseTree);
   return shape(parseTree, code);
 });
 
 console.log(
-  latex2js(`\\begin{aligned}\\begin{pmatrix}
-1 & 2 \\\\
-0 & 0
-\\end{pmatrix}\\begin{pmatrix}
-2 & 4 \\\\
-5 & 3
-\\end{pmatrix}+\\begin{pmatrix}
-1 & 2 \\\\
-9 & 2
-\\end{pmatrix}\\end{aligned}`)
+  latex2js(
+    `\\left( \\left( \\sqrt [3] {\\left( \\dfrac {6}{32}\\right) ^{2}}\\right) ^{2}+6-23\\right) /6`
+  )
 );
-console.log(
-  latex2js(`\\begin{aligned}\\begin{pmatrix}
-\\left[ x\\right]  \\\\
-\\left[ y\\right]
-\\end{pmatrix}\\end{aligned}`)
-);
+console.log(latex2js(`3\\times 2`));
+console.log(latex2js(`3\\div 2`));
+// console.log(
+//   latex2js(`\\begin{aligned}\\begin{pmatrix}
+// 1 & 2 \\\\
+// 0 & 0
+// \\end{pmatrix}\\begin{pmatrix}
+// 2 & 4 \\\\
+// 5 & 3
+// \\end{pmatrix}+\\begin{pmatrix}
+// 1 & 2 \\\\
+// 9 & 2
+// \\end{pmatrix}\\end{aligned}`)
+// );
+// console.log(
+//   latex2js(`\\begin{aligned}\\sin \\left( \\begin{pmatrix}
+//     x \\\\
+//     y
+//     \\end{pmatrix}\\begin{pmatrix}
+//     12.9 \\\\
+//     18.2
+//     \\end{pmatrix}\\right) \\cdot 437.5\\end{aligned}`)
+// );
+
+// console.log(
+//   latex2js(`\\begin{aligned}\\begin{pmatrix}
+// \\left[ x\\right]  \\\\
+// \\left[ y\\right]
+// \\end{pmatrix}\\end{aligned}`)
+// );
 // console.log(
 //   latex2js(`\\begin{aligned}\\begin{pmatrix}
 // 1 & 0 \\\\
 // 0 & 1
 // \\end{pmatrix}^{-1}\\end{aligned}`)
 // );
-console.log(
-  latex2js(`\\begin{aligned}2\\begin{pmatrix}
-1 & 0 \\\\
-0 & 1
-\\end{pmatrix}\\begin{pmatrix}
-1 & 5 \\\\
-2 & 3
-\\end{pmatrix}\\end{aligned}`)
-);
-console.log(
-  latex2js(`\\begin{aligned}\\begin{pmatrix}
-1.5 & i\\left[ 0\\right] & 0 & 3^{4^{2}} \\\\
-0.9 & \\left[ n\\right] & 0 & 0 \\\\
-0 & 0 & 1 & \\cos \\left( \\pi \\right) \\\\
-0 & 0 & 0 & 1
-\\end{pmatrix}-\\begin{pmatrix}
-2 & 3 & 4 & v \\\\
-t & g & 3 & 2 \\\\
-0 & a & 3 & 1 \\\\
-5 & 2 & 2 & k
-\\end{pmatrix}\\begin{pmatrix}
-4 & 2 & 4 & 8 \\\\
-5 & 9 & h & 2 \\\\
-6 & h & b & n \\\\
-k & g & a & x
-\\end{pmatrix}\\begin{pmatrix}
-4 & s & 4 & 8 \\\\
-5 & r & h & 2 \\\\
-m & r & b & n \\\\
-b & t & a & 3
-\\end{pmatrix}\\end{aligned}`)
-);
-console.log(
-  latex2js(`\\begin{aligned}y=2\\begin{pmatrix}
-  3 & 2 \\\\
-  1 & 0
-  \\end{pmatrix}\\end{aligned}`)
-);
+// console.log(
+//   latex2js(`\\begin{aligned}2\\begin{pmatrix}
+// 1 & 0 \\\\
+// 0 & 1
+// \\end{pmatrix}\\begin{pmatrix}
+// 1 & 5 \\\\
+// 2 & 3
+// \\end{pmatrix}\\end{aligned}`)
+// );
+// console.log(
+//   latex2js(`\\begin{aligned}\\begin{pmatrix}
+// 1.5 & i\\left[ 0\\right] & 0 & 3^{4^{2}} \\\\
+// 0.9 & \\left[ n\\right] & 0 & 0 \\\\
+// 0 & 0 & 1 & \\cos \\left( \\pi \\right) \\\\
+// 0 & 0 & 0 & 1
+// \\end{pmatrix}-\\begin{pmatrix}
+// 2 & 3 & 4 & v \\\\
+// t & g & 3 & 2 \\\\
+// 0 & a & 3 & 1 \\\\
+// 5 & 2 & 2 & k
+// \\end{pmatrix}\\begin{pmatrix}
+// 4 & 2 & 4 & 8 \\\\
+// 5 & 9 & h & 2 \\\\
+// 6 & h & b & n \\\\
+// k & g & a & x
+// \\end{pmatrix}\\begin{pmatrix}
+// 4 & s & 4 & 8 \\\\
+// 5 & r & h & 2 \\\\
+// m & r & b & n \\\\
+// b & t & a & 3
+// \\end{pmatrix}\\end{aligned}`)
+// );
+// console.log(
+//   latex2js(`\\begin{aligned}y=2\\begin{pmatrix}
+//   3 & 2 \\\\
+//   1 & 0
+//   \\end{pmatrix}\\end{aligned}`)
+// );
 // console.log(latex2js(`x_{1,0,3,4}`));
 // console.log(latex2js(`x_{10}`));
 // console.log(latex2js(`y=\\sqrt {\\dfrac {3^{5}}{2}}`, code));
